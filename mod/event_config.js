@@ -1,17 +1,19 @@
 // Written by tools/build-event.js - don't edit by hand; rebuild instead.
 window.__eventConfig = {
-  "title": "Kacky Event",
-  "tabTitle": "Kacky Event",
+  "title": "Claude Kacky Bash",
+  "tabTitle": "Claude Kacky Bash",
   "tabAllTracks": "All tracks",
   "tabCover": "images/covers/beba30d0-wide.jpg",
   "tabAllTracksCover": "images/covers/99a50f0b-wide.jpg",
   "organisers": [
-    "(test)"
+    "Hiksi",
+    "Cucuracha",
+    "Claude"
   ],
   "discordUrl": "",
-  "discordLabel": "Kacky Event Discord",
-  "start": "2026-10-10T18:00:00Z",
-  "end": "2026-10-24T18:00:00Z",
+  "discordLabel": "Claude Kacky Bash Discord",
+  "start": "2026-10-18T22:00:00Z",
+  "end": "2026-11-01T22:00:00Z",
   "ownerHash": "4950cdc42f1c2754a93ce720eb7a0d43616cf2148ee35f7d039b410416e3d52e",
   "difficulties": {
     "1": "Easy",
@@ -28,18 +30,18 @@ window.__eventConfig = {
 window.__eventWeeks = [
   {
     "week": 1,
-    "label": "Kacky Event",
+    "label": "Claude Kacky Bash",
     "chunks": [
-      "a181143918ecdb7b",
-      "f7ba3fdc78f4589f",
-      "17db99cf60ee2cd0",
-      "aadf26f1505eb6bd"
+      "b06143d253b1eda9",
+      "2701e9a60f3ec0b5",
+      "baa41455313377de",
+      "2c300a34f48bc6a9"
     ],
     "masks": [
-      "6f4dd1a9d4652b2a",
-      "80f28725ee274d4d",
-      "471ae3c18b0e50dc",
-      "e3bb804a101a393d"
+      "4885a855dca58338",
+      "32202550901b83ef",
+      "7430f6bec550e2e8",
+      "7df8cc61de632eb8"
     ],
     "file": "tracks/event/event.track",
     "tracks": [

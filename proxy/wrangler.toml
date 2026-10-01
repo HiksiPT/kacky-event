@@ -60,7 +60,10 @@ OWNER_USER_IDS = ["35eb5c466738dc9917d5f8320f5b99f12015247aaf0e512f5e4ecb547f00e
 
 # Written by tools/build-event.js: the event's start. Runs uploaded before it are refused,
 # except the owner's and the Author Medal account's.
-EVENT_START = "2026-10-10T18:00:00Z"
+EVENT_START = "2026-10-18T22:00:00Z"
+# Written by tools/build-event.js: the event's end. Runs uploaded after it are refused
+# (the owner's excepted), so the leaderboards and standings are final.
+EVENT_END = "2026-11-01T22:00:00Z"
 
 # Written by tools/build-event.js: the event's track ids.
 EVENT_TRACK_IDS = [

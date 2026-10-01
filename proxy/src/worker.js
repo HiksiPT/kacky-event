@@ -118,6 +118,8 @@ function readConfig(env) {
         eventWeek: intVar(env.EVENT_WEEK) ?? intVar(env.CURRENT_WEEK) ?? 1,
         // Runs uploaded before this moment are refused (owner and Author Medal account excepted).
         eventStart: env.EVENT_START ? Date.parse(env.EVENT_START) || null : null,
+        // Runs uploaded after this moment are refused too: the leaderboards are final.
+        eventEnd: env.EVENT_END ? Date.parse(env.EVENT_END) || null : null,
         ownerKeys: hashSet(env.OWNER_KEY_HASHES),
         // Moderators: sha256(OWNER_KEY_PREFIX + token), like the owner's, but they only get the
         // moderation page. Their own runs are checked and shielded like anyone else's.
@@ -642,7 +644,7 @@ function standingsFrom(cfg, boards, viewer) {
         averageRank: p.positions.reduce((a, b) => a + b, 0) / p.positions.length,
     })).sort((a, b) => b.finished - a.finished || a.averageRank - b.averageRank);
     // loaded < totalTracks while the first summaries are still being gathered.
-    return { updated: Date.now(), now: Date.now(), start: cfg.eventStart, totalTracks: cfg.eventTracks.length, loaded: boards.length, standings, tracks };
+    return { updated: Date.now(), now: Date.now(), start: cfg.eventStart, end: cfg.eventEnd, totalTracks: cfg.eventTracks.length, loaded: boards.length, standings, tracks };
 }
 
 async function computeStandings(env, cfg, request, viewer) {
@@ -832,6 +834,10 @@ async function handleSubmit(request, url, env, cfg, origin) {
     // The start lock: no run counts before the event starts.
     if (track.week != null && cfg.eventStart && Date.now() < cfg.eventStart && !ownerUpload && !cfg.authorIds.has(hash)) {
         return plain(403, "The event hasn't started yet", origin);
+    }
+    // The end lock: once the event is over the leaderboards are final, for everyone but the owner.
+    if (track.week != null && cfg.eventEnd && Date.now() >= cfg.eventEnd && !ownerUpload) {
+        return plain(403, "The event has ended", origin);
     }
     const read = readOptions(form);
     const body = track.hiddenId ? replaceFormValue(raw, "trackId", track.hiddenId) : raw;

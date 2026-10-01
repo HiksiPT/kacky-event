@@ -24,6 +24,8 @@ button[data-event-hidden] { display: none !important; }
   background-size: cover; background-position: center; image-rendering: pixelated; }
 .kev-card > .kev-cover::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(10,15,40,.75), rgba(10,15,40,.15) 60%, rgba(10,15,40,.55)); }
 .kev-card > .kev-cover.kev-fit { background-size: contain, cover; background-repeat: no-repeat; image-rendering: auto; }
+/* This event has no Discord button. */
+.menu-ui > .discord-link { display: none !important; }
 .kev-locked .kev-card > .kev-cover { cursor: not-allowed; filter: grayscale(.55) brightness(.8); }
 .kev-locked .kev-view { opacity: .5; cursor: not-allowed; }
 .kev-locked > .tracks-container:not(.kev-tab) { pointer-events: none; opacity: .35; }
@@ -156,7 +158,7 @@ button[data-event-hidden] { display: none !important; }
         };
         if (start && now < start) return "Starts in " + fmt(start - now);
         if (end && now < end) return "Ends in " + fmt(end - now);
-        if (end) return "The event has ended";
+        if (end) return "The event has ended · the leaderboards are locked, new times no longer count";
         return "";
     }
 
