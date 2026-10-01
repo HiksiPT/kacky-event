@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Event Moderation</title>
+<link rel="preload" href="forced_square.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<style>
+@font-face { font-family: "ForcedSquare"; src: url("forced_square.woff2") format("woff2"); }
+:root { --bg: #1b2150; --panel: #28346a; --row: #212b58; --text: #fff; --muted: #aab3dd; --good: #6fdc8c; --bad: #ff7b7b; --warn: #ffd54a; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: ForcedSquare, system-ui, sans-serif; }
+header { padding: 16px 24px; background: var(--panel); display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+h1 { margin: 0; font-size: 28px; flex: 1; }
+h2 { font-size: 22px; margin: 24px 0 8px; }
+main { padding: 8px 24px 48px; max-width: 1200px; margin: 0 auto; }
+button { font-family: inherit; font-size: 14px; background: #3a4a8f; color: #fff; border: none; border-radius: 4px; padding: 6px 10px; cursor: pointer; }
+button:hover { background: #4b5daa; }
+button.danger { background: #8f3a3a; } button.danger:hover { background: #aa4b4b; }
+input { font-family: inherit; font-size: 14px; padding: 6px 8px; border-radius: 4px; border: none; width: 420px; max-width: 100%; }
+table { width: 100%; border-collapse: separate; border-spacing: 0 4px; }
+th { text-align: left; color: var(--muted); font-weight: normal; font-size: 14px; padding: 4px 8px; }
+td { background: var(--row); padding: 6px 8px; font-size: 15px; }
+tr.hidden td { opacity: .55; }
+.pill { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; background: #3a4a8f; }
+.pill.site { background: #1f6b3a; } .pill.outside { background: #8f3a3a; } .pill.legacy { background: #6b5a1f; } .pill.approved { background: #1f4f6b; } .pill.author { background: #1f5f7a; }
+.muted { color: var(--muted); font-size: 14px; }
+.track { background: var(--panel); border-radius: 6px; padding: 8px 12px 12px; margin: 12px 0; }
+.track summary { cursor: pointer; font-size: 18px; }
+.flagbox { background: #3a2230; border: 2px solid #8f3a3a; border-radius: 6px; padding: 4px 12px 12px; margin: 12px 0; }
+.flagbox h2 { margin-top: 12px; }
+.pill.good { background: #1f6b3a; } .pill.bad { background: #8f3a3a; } .pill.wait { background: #6b5a1f; }
+#status { color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Event Moderation</h1>
+  <span id="status">Loading…</span>
+  <button id="reload">Refresh</button>
+</header>
+<main>
+  <p class="muted" id="who"></p>
+  <div id="tokenBox" style="display:none">
+    <p>This page only works for the event owner and moderators. Open it in the browser you play on, or paste your profile's private token (Garage → your name → Export). The token is only kept in this tab.</p>
+    <input id="token" placeholder="64-character private token" autocomplete="off"> <button id="useToken">Use token</button>
+  </div>
+  <div id="content"></div>
+</main>
+<script src="mod/api_base.js"></script>
+<script src="mod/event_config.js"></script>
+<script>
+(function () {
+  const API = window.__nswsApiBase;
+  const TRACKS = new Map((window.__eventTracks || []).map((t) => [t.id, t]));
+  const $ = (id) => document.getElementById(id);
+  let token = null;
+
+  function profileToken() {
+    try {
+      const slot = parseInt(localStorage.getItem("polytrack_v5_prod_user_slot") ?? "0", 10);
+      const p = JSON.parse(localStorage.getItem("polytrack_v5_prod_user_" + (slot >= 0 ? slot : 0)));
+      return p && /^[0-9a-f]{64}$/.test(p.token) ? p.token : null;
+    } catch { return null; }
+  }
+  const fmt = (frames) => {
+    const ms = frames % 1000, s = Math.floor(frames / 1000) % 60, m = Math.floor(frames / 60000);
+    return (m ? m + ":" + String(s).padStart(2, "0") : s) + "." + String(ms).padStart(3, "0");
+  };
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  async function post(path, extra) {
+    const res = await fetch(API + "nsws/mod/" + path, {
+      method: "POST", headers: { "Content-Type": "text/plain" }, credentials: "omit", cache: "no-store",
+      body: JSON.stringify({ token, ...extra }),
+    });
+    if (res.status === 403) {
+      $("tokenBox").style.display = "";
+      throw new Error("this profile isn't the owner or a moderator: paste an owner or moderator token below");
+    }
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return res.json();
+  }
+
+  function sourcePill(e) {
+    if (e.author) return '<span class="pill author">Author Medal</span>';
+    if (e.impostor) return '<span class="pill outside">Fake "Author Medal" (hidden)</span>';
+    const map = { proxy: ["site", "Driven on site"], outside: ["outside", "FLAGGED: driven off site"], legacy: ["legacy", "Already there before the site: hidden until you approve"], approved: ["approved", "Approved by you"] };
+    const [cls, label] = map[e.source] || ["", e.source ? e.source : "Unchecked"];
+    if (e.source === "outside") return `<span class="pill ${cls}">${label}</span>`;
+    return `<span class="pill ${cls}">${label}</span>` + (e.state && e.state !== "valid" ? ` <span class="muted">${esc(e.state)}${e.reason ? " · " + esc(e.reason) : ""}</span>` : "");
+  }
+
+  function replayPill(f) {
+    if (f.replay === "valid") return '<span class="pill good">Inputs really finish</span>';
+    if (f.replay === "invalid") return `<span class="pill bad">Inputs don't finish</span> <span class="muted">${esc(f.replay_reason)}</span>`;
+    return f.replay_reason === "no-recording" ? '<span class="pill bad">Recording gone</span>' : '<span class="pill wait">Checking…</span>';
+  }
+
+  // A flagged run as a clip code (this site's "ClipsClau2" format): paste it into
+  // Clips in the game to watch the run.
+  const b64url = (bytes) => { let s = ""; for (const b of bytes) s += String.fromCharCode(b); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); };
+  const fromB64url = (s) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
+  const pipe = async (bytes, stream) => new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(stream)).arrayBuffer());
+  async function clipCode(run) {
+    const rec = await pipe(fromB64url(run.recording), new DecompressionStream("deflate"));
+    const enc = new TextEncoder();
+    const parts = [enc.encode("Flagged " + (TRACKS.get(run.track)?.label || "")), enc.encode(run.nickname || "?"), enc.encode(run.track), enc.encode("")];
+    const size = parts.reduce((n, p) => n + 1 + p.length, 0) + 4 + rec.length;
+    const buf = new Uint8Array(size);
+    let pos = 0;
+    for (const p of parts) { buf[pos++] = p.length; buf.set(p, pos); pos += p.length; }
+    for (let i = 0; i < 4; i++) buf[pos++] = (run.frames >> (8 * i)) & 255;
+    buf.set(rec, pos);
+    const once = await pipe(buf, new CompressionStream("deflate"));
+    return "ClipsClau2" + b64url(await pipe(once, new CompressionStream("deflate")));
+  }
+
+  function render(data) {
+    const bans = new Map(data.moderation.bans.map((b) => [b.user_id, b]));
+    const removed = new Map(data.moderation.removed.map((r) => [r.id, r]));
+    const out = [];
+    const flagged = data.flagged || [];
+    const onBoard = new Set(data.tracks.flatMap((t) => t.entries.filter((e) => e.flagged).map((e) => e.id)));
+    const shadow = data.offsiteRuns !== "public";
+    out.push(`<p>${data.tracks.length} tracks · ${flagged.length} flagged run(s) · ${bans.size} banned account(s) · ${removed.size} removed run(s)</p>`);
+
+    out.push('<div class="flagbox"><h2>Flagged: driven off site</h2>');
+    out.push(`<p class="muted">Runs that reached the leaderboard without being driven on this site (for example with a track code pulled out of the site). ${shadow
+      ? "Each one is still shown to the player who drove it, on their boards and in their standings, so they think it counted. Nobody else sees it and it doesn't count."
+      : "OFFSITE_RUNS is \"public\": these are shown to everyone and count until you remove them."} Every one is kept here with its recording, even after the player replaces it.</p>`);
+    out.push(flagged.length ? "<table><tr><th>Track</th><th>Name</th><th>Time</th><th>First seen</th><th>Replay check</th><th>Status</th><th></th></tr>" + flagged.map((f) => {
+      const info = TRACKS.get(f.track) || { label: "?", name: String(f.track).slice(0, 10) };
+      const status = bans.has(f.user_id) ? "Player banned" : removed.has(f.id) ? "Removed" : f.source === "approved" ? "Approved: counts" : !onBoard.has(f.id) ? "Replaced / gone from board" : shadow ? "Only they see it" : "Shown to everyone";
+      const acts = [
+        f.saved ? `<button data-act="clip" data-id="${f.id}">Copy clip code</button>` : "",
+        removed.has(f.id) ? `<button data-act="restore" data-id="${f.id}">Restore</button>` : `<button class="danger" data-act="remove" data-id="${f.id}" data-track="${f.track}" data-user="${f.user_id}" data-name="${esc(f.nickname)}" data-frames="${f.frames}">Remove run</button>`,
+        bans.has(f.user_id) ? "" : `<button class="danger" data-act="ban" data-user="${f.user_id}" data-name="${esc(f.nickname)}">Ban player</button>`,
+        f.source === "outside" && !removed.has(f.id) ? `<button data-act="approve" data-id="${f.id}">Approve</button>` : "",
+      ].join(" ");
+      return `<tr><td>${esc(info.label)} ${esc(info.name)}</td><td>${esc(f.nickname)}</td><td>${fmt(f.frames)}</td><td>${new Date(f.first_seen).toLocaleString()}</td><td>${replayPill(f)}</td><td>${status}</td><td>${acts}</td></tr>`;
+    }).join("") + "</table>" : '<p class="muted">None yet.</p>');
+    out.push("</div>");
+
+    const withAuthor = data.tracks.filter((t) => t.authorFrames != null).length;
+    out.push("<h2>Validation runs (author times)</h2>");
+    out.push(`<p class="muted">The runs that were already on each map's own Kodub leaderboard when the site first read it are its validation runs. They are never shown on the site, and the fastest one on each map is its author time (the medals). ${withAuthor} of ${data.tracks.length} maps have one; open a map below to see them. If a validation run isn't one (someone else's old run), <b>Remove</b> it so it isn't used, or <b>Show as a normal run</b>.</p>
+      <p><button data-act="rebaseline">Re-read validation runs now</button> <span class="muted">Takes every run on the maps' Kodub leaderboards right now as the validation runs. Use it just before the event starts, never during it: runs driven off the site since then would become validation runs too.</span></p>`);
+
+    out.push("<h2>Banned accounts</h2>");
+    out.push(bans.size ? "<table><tr><th>Name</th><th>Reason</th><th>When</th><th></th></tr>" + [...bans.values()].map((b) =>
+      `<tr><td>${esc(b.nickname)}</td><td>${esc(b.reason)}</td><td>${new Date(b.at).toLocaleString()}</td><td><button data-act="unban" data-user="${b.user_id}">Unban</button></td></tr>`).join("") + "</table>" : '<p class="muted">None.</p>');
+    out.push("<h2>Removed runs</h2>");
+    out.push(removed.size ? "<table><tr><th>Track</th><th>Name</th><th>Time</th><th>Reason</th><th></th></tr>" + [...removed.values()].map((r) =>
+      `<tr><td>${esc(TRACKS.get(r.track)?.label || "?")} ${esc(TRACKS.get(r.track)?.name || "")}</td><td>${esc(r.nickname)}</td><td>${r.frames != null ? fmt(r.frames) : ""}</td><td>${esc(r.reason)}</td><td><button data-act="restore" data-id="${r.id}">Restore</button></td></tr>`).join("") + "</table>" : '<p class="muted">None.</p>');
+
+    out.push("<h2>Tracks</h2>");
+    const sorted = data.tracks.slice().sort((a, b) => (TRACKS.get(a.trackId)?.number ?? 999) - (TRACKS.get(b.trackId)?.number ?? 999));
+    for (const t of sorted) {
+      const info = TRACKS.get(t.trackId) || { label: "?", name: t.trackId.slice(0, 12) };
+      let pos = 0;
+      const rows = t.entries.map((e) => {
+        const shownRank = e.shown && !e.author ? ++pos : "";
+        const isBanned = bans.has(e.userId), isRemoved = removed.has(e.id);
+        const acts = [
+          isRemoved ? `<button data-act="restore" data-id="${e.id}">Restore run</button>`
+                    : `<button class="danger" data-act="remove" data-id="${e.id}" data-track="${t.trackId}" data-user="${e.userId}" data-name="${esc(e.nickname)}" data-frames="${e.frames}">Remove run</button>`,
+          isBanned ? `<button data-act="unban" data-user="${e.userId}">Unban</button>`
+                   : `<button class="danger" data-act="ban" data-user="${e.userId}" data-name="${esc(e.nickname)}">Ban player</button>`,
+          (e.source === "outside" || e.source === "legacy" || e.state === "invalid") && !isRemoved ? `<button data-act="approve" data-id="${e.id}">Approve</button>` : "",
+        ].join(" ");
+        const status = e.shown ? "Shown" : e.flagged && !isRemoved && !isBanned ? "Only they see it" : "Hidden";
+        return `<tr class="${e.shown ? "" : "hidden"}"><td>${shownRank}</td><td>${esc(e.nickname)}</td><td>${fmt(e.frames)}</td><td>${sourcePill(e)}</td><td>${status}</td><td>${acts}</td></tr>`;
+      }).join("");
+      const vrows = (t.validation || []).map((v) => `<tr class="${v.removed ? "hidden" : ""}"><td>${esc(v.nickname)}</td><td>${fmt(v.frames)}</td><td>${v.removed ? "Removed: not used" : v.authorTime ? '<span class="pill author">Author time</span>' : "Slower validation run"}</td><td>${
+        v.removed ? `<button data-act="restore" data-id="${v.id}">Restore</button>`
+                  : `<button class="danger" data-act="remove" data-id="${v.id}" data-track="${t.trackId}" data-user="${v.userId}" data-name="${esc(v.nickname)}" data-frames="${v.frames}">Remove</button> <button data-act="approve" data-id="${v.id}" data-track="${t.trackId}" data-user="${v.userId}" data-name="${esc(v.nickname)}" data-frames="${v.frames}">Show as a normal run</button>`}</td></tr>`).join("");
+      const vtable = `<p class="muted" style="margin:8px 0 2px">Validation runs (hidden from the site)${t.authorFrames != null ? " · author time " + fmt(t.authorFrames) : " · none, so no author time yet"}</p>` + (vrows ? `<table><tr><th>Name</th><th>Time</th><th></th><th></th></tr>${vrows}</table>` : "");
+      out.push(`<details class="track"><summary>${esc(info.label)} ${esc(info.name)} <span class="muted">· ${t.entries.length} run(s) · author time ${t.authorFrames != null ? fmt(t.authorFrames) : "none"}</span></summary>${vtable}<p class="muted" style="margin:10px 0 2px">Runs</p>
+        ${t.entries.length ? `<table><tr><th>Rank</th><th>Name</th><th>Time</th><th>Where it was driven</th><th>Status</th><th></th></tr>${rows}</table>` : '<p class="muted">No runs yet.</p>'}</details>`);
+    }
+    $("content").innerHTML = out.join("");
+  }
+
+  async function load() {
+    $("status").textContent = "Loading…";
+    try {
+      render(await post("overview", {}));
+      $("status").textContent = "Updated " + new Date().toLocaleTimeString();
+    } catch (err) {
+      $("status").textContent = "Error: " + err.message;
+    }
+  }
+
+  $("content").addEventListener("click", async (ev) => {
+    const b = ev.target.closest("button[data-act]");
+    if (!b) return;
+    const d = b.dataset;
+    const body = { id: d.id != null ? Number(d.id) : undefined, userId: d.user, nickname: d.name, track: d.track, frames: d.frames != null ? Number(d.frames) : undefined };
+    if (d.act === "clip") {
+      try {
+        const run = await post("recording", { id: body.id });
+        if (!run?.recording) throw new Error("the recording wasn't saved");
+        const code = await clipCode(run);
+        await navigator.clipboard.writeText(code).catch(() => prompt("Clip code:", code));
+        b.textContent = "Copied! Paste it in Clips";
+      } catch (err) {
+        alert("Couldn't make the clip: " + err.message);
+      }
+      return;
+    }
+    if (d.act === "rebaseline" && !confirm("Take every run that is on the maps' Kodub leaderboards right now as the validation runs (author times)? Only do this before the event starts.")) return;
+    if (d.act === "ban" || d.act === "remove") {
+      const reason = prompt((d.act === "ban" ? "Ban " : "Remove the run by ") + (d.name || "this player") + "? Reason (optional):", "");
+      if (reason === null) return;
+      body.reason = reason;
+    }
+    b.disabled = true;
+    try {
+      await post(d.act, body);
+      await load();
+    } catch (err) {
+      alert(err.message);
+      b.disabled = false;
+    }
+  });
+  $("reload").addEventListener("click", load);
+  $("useToken").addEventListener("click", () => {
+    const v = $("token").value.trim().toLowerCase();
+    if (!/^[0-9a-f]{64}$/.test(v)) return alert("That isn't a private token.");
+    token = v;
+    $("tokenBox").style.display = "none";
+    $("who").textContent = "Using the pasted token (kept in this tab only).";
+    load();
+  });
+
+  token = profileToken();
+  if (!API) { $("status").textContent = "mod/api_base.js is missing the proxy address"; return; }
+  if (token) { $("who").textContent = "Using the profile token of this browser's PolyTrack profile."; load(); }
+  else { $("tokenBox").style.display = ""; $("status").textContent = "Needs the owner's token"; }
+})();
+</script>
+</body>
+</html>

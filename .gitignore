@@ -1,0 +1,9 @@
+# Never commit plain track codes, tokens or build records.
+private/
+*.private.json
+event-build.json
+node_modules/
+proxy/.wrangler/
+proxy/.dev.vars
+.dev.vars
+_capture.js

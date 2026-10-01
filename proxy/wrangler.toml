@@ -1,0 +1,121 @@
+# Deploy from this directory:  npx wrangler deploy
+name = "kacky-event-proxy"
+main = "src/worker.js"
+compatibility_date = "2026-07-01"
+
+[observability]
+enabled = true
+
+[observability.logs]
+# Invocation logs record every request URL, and leaderboard reads carry the
+# player's userToken in the query string. Keep them off.
+invocation_logs = false
+
+[vars]
+UPSTREAM = "https://vps.kodub.com"
+UPSTREAM_ORIGIN = "https://www.kodub.com"
+
+# Scheme + host, no path: the address GitHub Pages serves the site from.
+# Every other site gets 403. EDIT THIS before deploying (see README.md).
+ALLOWED_ORIGINS = ["https://HiksiPT.github.io"]
+
+# Hidden from every board and the standings (not case-sensitive). Most moderation is
+# easier from the moderation page (moderate.html), which bans by account, not by name.
+BANNED_NICKNAMES = []
+
+# The event is "week 1". Other players' recordings on it are never sent to anyone.
+CURRENT_WEEK = 1
+EVENT_WEEK = 1
+
+# false: everyone's time and rank are shown (only recordings are private).
+HIDE_TIMES = "false"
+
+# Runs uploaded to Kodub some other way than this site (e.g. with an extracted track code)
+# are flagged and saved for the moderation page either way.
+#   "shadow": the player who drove it still sees it everywhere on the site (their own board,
+#             rank, standings), so they think it counted; nobody else sees it or is ranked
+#             against it.
+#   "public": shown to everyone and counted until you remove it.
+OFFSITE_RUNS = "shadow"
+
+# The medal account. Its time sets the Author/Gold/Silver/Bronze medals, and it is left
+# out of the overall standings and of every player's rank. Must match
+# BENCHMARK_NICKNAME in main.bundle.js.
+PUBLIC_NICKNAMES = ["Author Medal"]
+# The real Author Medal account's user id (private/author-medal.json). Anyone else who names
+# themselves "Author Medal" is hidden, so they can't set the medals or skip the standings.
+AUTHOR_USER_IDS = ["ed337cc9b0289331f1748cd3049083c6c24f825bddd2bdf132bb33c2a9b80f68"]
+
+# Runs on the event are stored on Kodub under a secret track id (needs the TRACK_SALT
+# secret), so nobody can read them through Kodub or another proxy. Never change it or
+# TRACK_SALT once runs exist.
+HIDDEN_FROM_WEEK = 1
+
+# The owner (you). tools/owner-key.js prints both values from your profile's private token.
+OWNER_KEY_HASHES = ["4950cdc42f1c2754a93ce720eb7a0d43616cf2148ee35f7d039b410416e3d52e"]
+# Moderators: can use the moderation page (moderate.html) and nothing else.
+# tools/owner-key.js prints this value too (the OWNER_KEY_HASHES line).
+MODERATOR_KEY_HASHES = ["5d8f7b8637650e58ed043165cb8370172e3c549b8e386a016151a71b949ab735"]
+OWNER_USER_IDS = ["35eb5c466738dc9917d5f8320f5b99f12015247aaf0e512f5e4ecb547f00e0e1"]
+
+# Written by tools/build-event.js: the event's track ids.
+EVENT_TRACK_IDS = [
+    "e5e853a39fe100c88d5ab91d51e8aa31e2537c8920fbbf1b162fe093bd177241", # #01 Lateral Leap
+    "3566c402a71a0bfcebaeb77e4ad86616c3c584201d28c9aeecb99d34789e6fcf", # #02 Stepping Stones
+    "074cb1e857b0d4cb80448aab1796287ee43cc6d59ce0b2ae3935aa63d4a7e570", # #03 Boomerang
+    "19619986df662f6acfdc78eadca5f8207c5f7138d15ab2ef259701b30ca4cc38", # #04 Brake Dance
+    "beba30d07071a71a2b60c5378acf6ac820ccc26ff7ac2c23a6fa210b6309a28d", # #05 Pinhole
+    "17020602f11c6dfcedc258850a08a1fc056a248f09050b8babe3b37fa384adba", # #06 Double Moonshot
+    "b6364342008b0d2463cbe043a5abf9b9fb9bd769098916c27075cfc2870fa02a", # #07 Ledge Pop
+    "b7918008e64b7d84d0bcfb415072a4f23bb5aa4a53dec6b0a776f137b79bfcde", # #08 Pillar Curve
+    "c5eda9c4789a7408f7f1cb3f6e955380dae5246fff08abe4c4d76f69f790b050", # #09 Pipe Dream
+    "ec66176795215c59621da397e1bb9e8541dd17d6e1376ab1682a4623fcf6d556", # #10 Reverse Psychology
+    "bb7ae5c7a9c84a0f0321bc017da1e73c7abbd3611f5b840f76c413476c9cf5f5", # #11 Letterbox
+    "cbeb262780a86131af811418a344a26677e0aeecc1f23b9b5902b05c5b700dca", # #12 Crosswind
+    "157c8db0f8780cae0c5dfd4553ebcac55fc75dd228176f45a93fcbc3b2adf757", # #13 Reverse Needle
+    "87dd848cdb4addfdb9f8708138aabd1757aa7edf7cc4afa0b759d0f23b355426", # #14 Hey, its me, its Kackity
+    "fffd821a52023dffcc498d984ad99e8a8de26b15d1493e43648e864633b81cef", # #15 Staircase
+    "d67e8aaced6b19b4a80b42447c029bc684ccc359ed1bb9b1d6df714da183bab2", # #16 Lateral Moon Leap Staircase Break Dance
+    "e5217719ba2febeb35110d0eb8bc709c77f9508bfa800008e33ce05e724dd38d", # #17 Moonshot
+    "d9282b45cc821181b284c63b63863f7fc363f34955d3f335f43d678f89d49b6d", # #18 Needle's Eye
+    "569e1dde5898ade37af531d4af02b451d606f219b9ff28dbdaaa5f9b4bd6119f", # #19 Float Point
+    "a37519a2164402f2eb68ef1d8085ef2d3d549ee76ab26f3c682a2c430e777ef0", # #20 Tightrope
+    "fb911d8251451fab1cc7ad654f61bb8fa325e2b1317bc3211e247b9f27db2656", # #21 Ledge Moonshot
+    "4b3934c507225756080dc63bee6b8b07ae787769747877935827b78e59fe400b", # #22 Pipe to Pillar
+    "75eb6c2e532bbaaaa7ede7dd6064d72ec92a7ca353e32e4085f9f6a1dc35c79d", # #23 Threading
+    "6062c3fb8519905fb6e6c1041ec742d8a5ccdcb06a09f295f4b22472a511c325", # #24 Lateral Pipe Shot
+    "143dfe90a26e8be5f86febd6be27e2f837aed61c484770e61dc083a1cfe70ee0", # #25 Gauntlet
+    "2ca5f69d00d8d4ffb12d8dfd618c69259635a74592dc9d7f529fa154a1eb9809", # #26 Coffin
+    "64cadef080612ebb20e8604603af4cfa8337e7874d5ccc41ad80c0240abb32f4", # #27 Parking Garage
+    "99a50f0b717e3459028114e5d0d84e880e1f19ce9e9c9c86b9717368c14da4a7", # #28 Freefall
+    "860fdd1d1d4ddcf3b22fcf95b57c017710394b2ecee003df8804da5ea0d62d16", # #29 Kackiest
+    "ade4d6990a75b903e56c14c25c43717a3d4c985f71cb2e16c5e50968b04abc78", # #30 Tumble Dry
+]
+
+# init.bin (the game's physics meshes for the anti-cheat) is imported as an ArrayBuffer.
+[[rules]]
+type = "Data"
+globs = ["**/*.bin"]
+fallthrough = true
+
+# Site traffic for the owner dashboard (src/traffic.js).
+[[durable_objects.bindings]]
+name = "TRAFFIC"
+class_name = "TrafficStats"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["TrafficStats"]
+
+# Anti-cheat (src/anticheat.js): verdicts and synced tracks, and the physics replays.
+[[durable_objects.bindings]]
+name = "ANTICHEAT"
+class_name = "AntiCheat"
+
+[[durable_objects.bindings]]
+name = "RUN_CHECKER"
+class_name = "RunChecker"
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["AntiCheat", "RunChecker"]

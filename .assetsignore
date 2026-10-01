@@ -1,0 +1,33 @@
+# Build tooling / dependencies - not part of the served site
+node_modules
+package.json
+package-lock.json
+bun.lock
+bun.lockb
+
+# Version control / CI
+.git
+.github
+
+# Desktop app build (Electron) - not used by the web build
+electron
+
+# Mobile build (Capacitor/Android) - not used by the web build
+android
+
+# Wrangler / Cloudflare config itself
+wrangler.toml
+.wrangler
+.dev.vars
+.assetsignore
+
+# Local backups of patched files
+*.bak
+
+# Misc dev files
+*.md
+.gitignore
+.eslintrc*
+eslint.config.*
+tsconfig.json
+jest.config.*

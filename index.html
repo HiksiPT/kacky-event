@@ -1,0 +1,34 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>PolyTrack Kacky Event</title>
+        <link rel="preload" href="forced_square.woff2" as="font" type="font/woff2" crossorigin="anonymous"/>
+        <link rel="preload" href="images/logo.svg" as="image" type="image/svg+xml"/>
+        <link rel="preload" href="images/discord.svg" as="image" type="image/svg+xml"/>
+        <link rel="manifest" href="manifest.json"/>
+        <meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,viewport-fit=cover,user-scalable=no">
+        <!-- Makes casual digging through the page harder; it is not what keeps codes safe
+             (see README.md, "What is and isn't protected"). -->
+        <script src="https://cdn.jsdelivr.net/npm/disable-devtool@0.3.9"></script>
+        <script>
+            DisableDevtool({
+                ondevtoolopen: () => {
+                    document.body.innerHTML = "<h1 style='color:#fff;text-align:center;margin-top:20vh;font-family:sans-serif;'>Developer tools are disabled.</h1>";
+                }
+            });
+        </script>
+        <script src="./mod/api_base.js"></script>
+        <script src="./mod/event_config.js"></script>
+        <script defer="defer" src="./mod/nsws_traffic.js"></script>
+        <script defer="defer" src="./mod/kacky_event.js"></script>
+        <script defer="defer" src="./mod/grinding_stats.js"></script>
+        <script defer="defer" src="error_screen.bundle.js"></script>
+        <script defer="defer" src="main.bundle.js"></script>
+    </head>
+    <body>
+        <canvas id="screen"></canvas>
+        <div id="ui"></div>
+        <div id="transition-layer"></div>
+    </body>
+</html>
