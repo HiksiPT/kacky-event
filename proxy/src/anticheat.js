@@ -69,6 +69,8 @@ export class AntiCheat extends DurableObject {
             country TEXT, frames INTEGER NOT NULL, recording TEXT, replay TEXT NOT NULL, replay_reason TEXT,
             first_seen INTEGER NOT NULL, last_seen INTEGER NOT NULL)`);
         this.sql.exec("CREATE INDEX IF NOT EXISTS flagged_track ON flagged(track)");
+        // Standings: one small summary per event map (see eventSummaries in worker.js).
+        this.sql.exec("CREATE TABLE IF NOT EXISTS event_summaries (track TEXT PRIMARY KEY, at INTEGER NOT NULL, data TEXT NOT NULL)");
     }
 
     // Banned user ids and removed run ids, cached until the next moderation change.
@@ -142,6 +144,31 @@ export class AntiCheat extends DurableObject {
             VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
             ON CONFLICT(id) DO UPDATE SET last_seen = excluded.last_seen, nickname = excluded.nickname`,
             e.id, track, week, e.userId ?? null, e.nickname ?? null, e.countryCode ?? null, e.frames, now, now);
+    }
+
+    // The stored standings summaries, by track id.
+    async eventSummaries() {
+        const out = {};
+        for (const row of this.sql.exec("SELECT track, at, data FROM event_summaries")) {
+            try {
+                out[row.track] = { ...JSON.parse(row.data), at: row.at };
+            } catch {
+                /* unreadable row: it is simply refreshed */
+            }
+        }
+        return out;
+    }
+
+    async saveEventSummaries(list) {
+        for (const s of list) {
+            this.sql.exec(`INSERT INTO event_summaries (track, at, data) VALUES (?, ?, ?)
+                ON CONFLICT(track) DO UPDATE SET at = excluded.at, data = excluded.data`, s.trackId, s.at, JSON.stringify(s));
+        }
+    }
+
+    // After moderation: every summary is refreshed before it is trusted again.
+    async staleEventSummaries() {
+        this.sql.exec("UPDATE event_summaries SET at = 0");
     }
 
     // Kacky event: validation runs. The runs already on a map's own Kodub board when the

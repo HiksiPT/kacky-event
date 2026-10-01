@@ -101,7 +101,8 @@ function readConfig(env) {
     return {
         upstream: env.UPSTREAM || DEFAULT_UPSTREAM,
         upstreamOrigin: env.UPSTREAM_ORIGIN || DEFAULT_UPSTREAM_ORIGIN,
-        allowedOrigins: listVar(env.ALLOWED_ORIGINS, DEFAULT_ALLOWED_ORIGINS),
+        // Browsers send the Origin's host in lowercase, whatever case the list was typed in.
+        allowedOrigins: listVar(env.ALLOWED_ORIGINS, DEFAULT_ALLOWED_ORIGINS).map((o) => o.trim().toLowerCase().replace(/\/+$/, "")),
         banned: new Set(listVar(env.BANNED_NICKNAMES, []).map(normalizeNickname)),
         publicNicknames: new Set(listVar(env.PUBLIC_NICKNAMES, []).map(normalizeNickname)),
         // The real Author Medal account(s). When set, anyone else using a PUBLIC_NICKNAMES name
@@ -167,7 +168,7 @@ async function applyVerdicts(env, cfg, track, view) {
 }
 
 function isAllowedOrigin(origin, cfg) {
-    return !!origin && (cfg.allowedOrigins.includes(origin) || cfg.allowedOrigins.includes("*"));
+    return !!origin && (cfg.allowedOrigins.includes(origin.toLowerCase()) || cfg.allowedOrigins.includes("*"));
 }
 
 // Opening a proxy URL in a tab (from the network panel, a copied link, ...) is
@@ -544,9 +545,9 @@ function shield(entry, position, callerHashValue, cfg) {
 // applied), with the Author Medal account(s) taken out so they never take a rank.
 // ranked: the runs everyone sees. flagged: the runs not driven on the site (with
 // OFFSITE_RUNS = "public" they are in ranked instead).
-async function eventBoards(env, cfg, request, fresh = false) {
+async function eventBoards(env, cfg, request, fresh = false, trackIds = cfg.eventTracks) {
     const read = { version: DEFAULT_VERSION, onlyVerified: "false" };
-    return Promise.all(cfg.eventTracks.map(async (trackId) => {
+    return Promise.all(trackIds.map(async (trackId) => {
         const track = await trackContext(cfg, trackId, String(cfg.eventWeek));
         const view = await loadView(env, cfg, request, track, read, fresh);
         const verdict = await blockedRuns(env, cfg, track, view).catch(() => null);
@@ -563,15 +564,51 @@ async function eventBoards(env, cfg, request, fresh = false) {
     }));
 }
 
-let boardsCache = null;
-let standingsCache = null;
 const STANDINGS_TTL_MS = 60_000;
+// Cloudflare's free plan allows 50 outside requests (Kodub reads and anti-cheat calls) per
+// request to the Worker, and one map costs four. So the standings are kept as one small
+// summary per map, stored in the anti-cheat object, and each request for them refreshes only
+// the few maps whose summary is oldest. Everyone gets the stored summaries of the rest.
+const REFRESH_PER_REQUEST = 8;
+const SUMMARY_REUSE_MS = 15_000;
+let summaries = null;     // { at, byTrack: { trackId: summary } }, this Worker instance's copy
 
-async function cachedEventBoards(env, cfg, request) {
-    if (boardsCache && Date.now() - boardsCache.at < STANDINGS_TTL_MS) return boardsCache.boards;
-    const boards = await eventBoards(env, cfg, request);
-    boardsCache = { at: Date.now(), boards };
-    return boards;
+// What the standings need from one map's board.
+function summarize(b) {
+    const slim = (e) => ({ id: e.id, userId: e.userId, nickname: e.nickname, countryCode: e.countryCode ?? null, frames: e.frames });
+    return {
+        trackId: b.trackId,
+        at: Date.now(),
+        ranked: b.ranked.map(slim),
+        flagged: b.flagged.map(slim),
+        // The validation run's time; without one, the Author Medal account's.
+        authorFrames: b.validationFrames ?? (b.benchmark.length ? Math.min(...b.benchmark.map((e) => e.frames)) : null),
+    };
+}
+
+async function eventSummaries(env, cfg, request) {
+    const anti = antiCheat(env);
+    const now = Date.now();
+    if (!summaries || now - summaries.at > SUMMARY_REUSE_MS) {
+        const stored = anti ? await anti.eventSummaries().catch(() => null) : null;
+        summaries = { at: now, byTrack: stored ?? summaries?.byTrack ?? {} };
+    }
+    const byTrack = summaries.byTrack;
+    const stale = cfg.eventTracks
+        .filter((id) => !byTrack[id] || now - byTrack[id].at > STANDINGS_TTL_MS)
+        .sort((a, b) => (byTrack[a]?.at ?? 0) - (byTrack[b]?.at ?? 0))
+        .slice(0, REFRESH_PER_REQUEST);
+    if (stale.length) {
+        try {
+            const fresh = (await eventBoards(env, cfg, request, false, stale)).map(summarize);
+            for (const s of fresh) byTrack[s.trackId] = s;
+            if (anti) await anti.saveEventSummaries(fresh).catch(() => {});
+        } catch (err) {
+            // Kodub unreachable or a limit hit: serve what is stored rather than nothing.
+            console.error("standings refresh failed:", err && err.message);
+        }
+    }
+    return cfg.eventTracks.map((id) => byTrack[id]).filter(Boolean);
 }
 
 // Ranked by maps finished (more is better), then by average rank over the maps finished.
@@ -587,8 +624,7 @@ function standingsFrom(cfg, boards, viewer) {
         tracks[b.trackId] = {
             finishers: ranked.length,
             top3: ranked.slice(0, 3).map((e) => ({ nickname: e.nickname, countryCode: e.countryCode ?? null, frames: e.frames })),
-            // The validation run's time; without one, the Author Medal account's.
-            authorFrames: b.validationFrames ?? (b.benchmark.length ? Math.min(...b.benchmark.map((e) => e.frames)) : null),
+            authorFrames: b.authorFrames,
         };
         ranked.forEach((e, i) => {
             const key = e.userId || "#" + e.id;
@@ -603,14 +639,13 @@ function standingsFrom(cfg, boards, viewer) {
         finished: p.positions.length,
         averageRank: p.positions.reduce((a, b) => a + b, 0) / p.positions.length,
     })).sort((a, b) => b.finished - a.finished || a.averageRank - b.averageRank);
-    return { updated: Date.now(), totalTracks: cfg.eventTracks.length, standings, tracks };
+    // loaded < totalTracks while the first summaries are still being gathered.
+    return { updated: Date.now(), totalTracks: cfg.eventTracks.length, loaded: boards.length, standings, tracks };
 }
 
 async function computeStandings(env, cfg, request, viewer) {
-    const boards = await cachedEventBoards(env, cfg, request);
-    if (viewer && boards.some((b) => b.flagged.some((e) => e.userId === viewer))) return standingsFrom(cfg, boards, viewer);
-    if (!standingsCache || standingsCache.boards !== boards) standingsCache = { boards, data: standingsFrom(cfg, boards, null) };
-    return standingsCache.data;
+    const boards = await eventSummaries(env, cfg, request);
+    return standingsFrom(cfg, boards, viewer);
 }
 
 async function handleStandings(request, url, env, cfg, origin) {
@@ -621,9 +656,11 @@ async function handleStandings(request, url, env, cfg, origin) {
 
 // The owner's moderation page: every run on every event track, in full, with where it
 // came from, plus the ban and removed-run lists.
-async function moderationOverview(env, cfg, request) {
+// trackIds: the maps to list in this call (the page asks for a few at a time, to stay inside
+// the free plan's 50 outside requests).
+async function moderationOverview(env, cfg, request, trackIds) {
     const anti = antiCheat(env);
-    const boards = await eventBoards(env, cfg, request, true);
+    const boards = await eventBoards(env, cfg, request, true, trackIds);
     const tracks = [];
     for (const b of boards) {
         const seen = anti ? new Map((await anti.runs(b.trackId)).map((r) => [r.id, r])) : new Map();
@@ -649,6 +686,7 @@ async function moderationOverview(env, cfg, request) {
     }
     return {
         tracks,
+        eventTracks: cfg.eventTracks,
         offsiteRuns: cfg.offsitePublic ? "public" : "shadow",
         flagged: anti ? await anti.flaggedRuns() : [],
         moderation: anti ? await anti.moderation() : { bans: [], removed: [] },
@@ -659,8 +697,7 @@ async function moderationOverview(env, cfg, request) {
 
 function afterModeration() {
     baselines.clear();
-    boardsCache = null;
-    standingsCache = null;
+    summaries = null;
     verdicts.clear();
 }
 
@@ -988,7 +1025,11 @@ async function handleTraffic(request, url, env, cfg, origin, ctx) {
         const reason = typeof body.reason === "string" ? body.reason.slice(0, 200) : null;
         const nickname = typeof body.nickname === "string" ? body.nickname.slice(0, 64) : null;
         let result;
-        if (what === "overview") return json(await moderationOverview(env, cfg, request), origin);
+        if (what === "overview") {
+            // At most 6 maps per call; with none named, only the lists that aren't per map.
+            const wanted = Array.isArray(body.tracks) ? body.tracks.filter((id) => cfg.eventTracks.includes(id)).slice(0, 6) : [];
+            return json(await moderationOverview(env, cfg, request, wanted), origin);
+        }
         if (what === "recording") {
             if (!Number.isSafeInteger(body.id)) return plain(400, "Bad request", origin);
             return json(await anti.flaggedRecording(body.id), origin);
@@ -1024,6 +1065,8 @@ async function handleTraffic(request, url, env, cfg, origin, ctx) {
             return plain(404, "Not found", origin);
         }
         afterModeration();
+        // The stored standings summaries are out of date now; they are refreshed first.
+        await anti.staleEventSummaries().catch(() => {});
         return json(result, origin);
     }
     if (url.pathname === TRAFFIC_PREFIX + "live") return json(await stub.liveStats(), origin);

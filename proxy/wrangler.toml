@@ -17,7 +17,7 @@ UPSTREAM_ORIGIN = "https://www.kodub.com"
 
 # Scheme + host, no path: the address GitHub Pages serves the site from.
 # Every other site gets 403. EDIT THIS before deploying (see README.md).
-ALLOWED_ORIGINS = ["https://HiksiPT.github.io"]
+ALLOWED_ORIGINS = ["https://hiksipt.github.io"]
 
 # Hidden from every board and the standings (not case-sensitive). Most moderation is
 # easier from the moderation page (moderate.html), which bans by account, not by name.

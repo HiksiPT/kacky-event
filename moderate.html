@@ -186,7 +186,17 @@ tr.hidden td { opacity: .55; }
   async function load() {
     $("status").textContent = "Loading…";
     try {
-      render(await post("overview", {}));
+      // The Worker lists a few maps per call (Cloudflare's free plan limits how much one call may do).
+      const data = await post("overview", {});
+      const ids = data.eventTracks || [];
+      for (let i = 0; i < ids.length; i += 6) {
+        $("status").textContent = `Loading… ${Math.min(i + 6, ids.length)}/${ids.length} maps`;
+        const part = await post("overview", { tracks: ids.slice(i, i + 6) });
+        data.tracks.push(...part.tracks);
+        data.flagged = part.flagged;
+        data.moderation = part.moderation;
+      }
+      render(data);
       $("status").textContent = "Updated " + new Date().toLocaleTimeString();
     } catch (err) {
       $("status").textContent = "Error: " + err.message;

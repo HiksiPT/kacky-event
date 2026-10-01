@@ -204,7 +204,9 @@ button[data-event-hidden] { display: none !important; }
             authorCache.data.catch(() => (authorCache = null));
         }
         return authorCache.data.then((d) => {
-            const frames = d.tracks?.[trackId]?.authorFrames;
+            // Not gathered yet is "don't know", not "no author time".
+            if (!d.tracks || !(trackId in d.tracks)) throw new Error("author time not loaded yet");
+            const frames = d.tracks[trackId].authorFrames;
             return typeof frames === "number" ? frames / 1000 : null;
         });
     };
@@ -230,7 +232,10 @@ button[data-event-hidden] { display: none !important; }
                 top.forEach((p, i) => c.top3.appendChild(el("li", null, ["🥇", "🥈", "🥉"][i] + p.nickname)));
             }
             noteEl.textContent = "Ranked by maps finished, then average rank (AP) · updated "
-                + new Date(data.updated).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+                + new Date(data.updated).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                + (data.loaded < data.totalTracks ? ` · loading maps ${data.loaded}/${data.totalTracks}` : "");
+            // The Worker gathers a few maps per request, so ask again soon until it has them all.
+            if (data.loaded < data.totalTracks) setTimeout(refresh, 4000);
         } catch (err) {
             noteEl.textContent = "Couldn't load the standings (" + err.message + ")";
         } finally {
