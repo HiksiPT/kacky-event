@@ -13,7 +13,8 @@
 const fs = require("fs");
 const crypto = require("crypto");
 
-const CAR_STYLE = "AAAAAD8HW____xMTE2ZmZg";
+// Primary #044600, secondary #6d6e00, frame #000000, rims #676767.
+const CAR_STYLE = "AAAAAABGBABubQAAAGdnZw";
 
 async function main() {
     const [api, site, runsFile, accountFile] = process.argv.slice(2);

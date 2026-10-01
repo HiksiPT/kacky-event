@@ -139,6 +139,9 @@ async function main() {
         title,
         tabTitle: cfg.tabTitle || title,
         tabAllTracks: cfg.tabAllTracks || "All tracks",
+        // Pictures behind the two tabs on the track selection screen.
+        tabCover: cfg.tabCover || null,
+        tabAllTracksCover: cfg.tabAllTracksCover || null,
         organisers: cfg.organisers || [],
         discordUrl: cfg.discordUrl || "",
         discordLabel: cfg.discordLabel || (title + " Discord"),

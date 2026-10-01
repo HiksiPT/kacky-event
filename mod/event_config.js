@@ -3,6 +3,8 @@ window.__eventConfig = {
   "title": "Kacky Event",
   "tabTitle": "Kacky Event",
   "tabAllTracks": "All tracks",
+  "tabCover": "images/covers/beba30d0-wide.jpg",
+  "tabAllTracksCover": "images/covers/99a50f0b-wide.jpg",
   "organisers": [
     "(test)"
   ],
@@ -28,16 +30,16 @@ window.__eventWeeks = [
     "week": 1,
     "label": "Kacky Event",
     "chunks": [
-      "31370c7835602352",
-      "dca3a59e797f8449",
-      "3c8f19073bf88728",
-      "ac61ae1813022908"
+      "496e5527f55e2078",
+      "cef71cf743547a94",
+      "37de14b43fc6169b",
+      "b256c8390c52b96e"
     ],
     "masks": [
-      "dcc6ac3032c69a35",
-      "66490736a487c217",
-      "611e844b6cdff879",
-      "e3f913cfb3518bfb"
+      "ad17d2d11e5eb118",
+      "307e5c84a7c21657",
+      "e25aed5cbb769b6c",
+      "156fae9d753175f5"
     ],
     "file": "tracks/event/event.track",
     "tracks": [

@@ -252,6 +252,17 @@ button[data-event-hidden] { display: none !important; }
         button.appendChild(el("div", "cover"));
         button.appendChild(document.createTextNode(CFG.tabTitle || CFG.title || "Event"));
         bar.prepend(button);
+        // Each tab's picture: a screenshot of one of the maps (the game draws tab pictures on ::before).
+        const other0 = [...bar.querySelectorAll("button")].find((b) => b !== button);
+        other0?.classList.add("kev-all-tab");
+        if (!document.getElementById("kev-tab-covers")) {
+            const rules = document.createElement("style");
+            rules.id = "kev-tab-covers";
+            // A slight blue wash and a vignette over the screenshot, like the game's own tab pictures.
+            const rule = (cls, url) => (url ? `.category-container > button.${cls}::before{background-image:radial-gradient(ellipse at center, rgba(17,32,82,0) 35%, rgba(10,18,50,0.78) 100%), linear-gradient(rgba(40,70,160,0.28), rgba(40,70,160,0.28)), url("${url}") !important;}` : "");
+            rules.textContent = rule("kev-tab-button", CFG.tabCover) + rule("kev-all-tab", CFG.tabAllTracksCover);
+            document.head.appendChild(rules);
+        }
         const container = el("div", "tracks-container kev-tab");
         ui.appendChild(container);
         build(container);
