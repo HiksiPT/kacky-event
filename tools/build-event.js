@@ -172,7 +172,8 @@ async function main() {
     const toml = fs.readFileSync(tomlPath, "utf8");
     const ids = "EVENT_TRACK_IDS = [\n" + order.map((t) => `    "${t.id}", # ${label(t)} ${t.name.replace(/[\r\n#]/g, "")}`).join("\n") + "\n]";
     if (!/EVENT_TRACK_IDS = \[[^\]]*\]/.test(toml)) fail("EVENT_TRACK_IDS not found in proxy/wrangler.toml");
-    fs.writeFileSync(tomlPath, toml.replace(/EVENT_TRACK_IDS = \[[^\]]*\]/, ids));
+    if (!/EVENT_START = "[^"]*"/.test(toml)) fail("EVENT_START not found in proxy/wrangler.toml");
+    fs.writeFileSync(tomlPath, toml.replace(/EVENT_TRACK_IDS = \[[^\]]*\]/, ids).replace(/EVENT_START = "[^"]*"/, `EVENT_START = "${cfg.start || ""}"`));
 
     // Private record of the build (ranks, numbers, ids) - next to the input, not in the site.
     const record = path.join(path.dirname(path.resolve(input)), "event-build.json");

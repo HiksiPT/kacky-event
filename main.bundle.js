@@ -54285,6 +54285,8 @@ window.__nswsTrackQuery = function(trackId) {
         });
 
         const __evLoadContainer = async function(file) {
+            // Until the event starts only the owner can load the maps (mod/kacky_event.js).
+            if (window.__eventLocked?.() && !(await window.__eventIsOwner?.())) throw new Error("The event hasn't started yet");
             if (__evTrackCache[file]) return __evTrackCache[file];
             const info = __evKeyCache[file];
             const res = await fetch(info.file);

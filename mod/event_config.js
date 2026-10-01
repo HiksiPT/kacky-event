@@ -30,16 +30,16 @@ window.__eventWeeks = [
     "week": 1,
     "label": "Kacky Event",
     "chunks": [
-      "496e5527f55e2078",
-      "cef71cf743547a94",
-      "37de14b43fc6169b",
-      "b256c8390c52b96e"
+      "a181143918ecdb7b",
+      "f7ba3fdc78f4589f",
+      "17db99cf60ee2cd0",
+      "aadf26f1505eb6bd"
     ],
     "masks": [
-      "ad17d2d11e5eb118",
-      "307e5c84a7c21657",
-      "e25aed5cbb769b6c",
-      "156fae9d753175f5"
+      "6f4dd1a9d4652b2a",
+      "80f28725ee274d4d",
+      "471ae3c18b0e50dc",
+      "e3bb804a101a393d"
     ],
     "file": "tracks/event/event.track",
     "tracks": [

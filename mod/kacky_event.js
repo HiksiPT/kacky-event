@@ -24,6 +24,9 @@ button[data-event-hidden] { display: none !important; }
   background-size: cover; background-position: center; image-rendering: pixelated; }
 .kev-card > .kev-cover::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(10,15,40,.75), rgba(10,15,40,.15) 60%, rgba(10,15,40,.55)); }
 .kev-card > .kev-cover.kev-fit { background-size: contain, cover; background-repeat: no-repeat; image-rendering: auto; }
+.kev-locked .kev-card > .kev-cover { cursor: not-allowed; filter: grayscale(.55) brightness(.8); }
+.kev-locked .kev-view { opacity: .5; cursor: not-allowed; }
+.kev-locked > .tracks-container:not(.kev-tab) { pointer-events: none; opacity: .35; }
 .kev-card:hover > .kev-cover { filter: brightness(1.15); }
 .kev-name, .kev-author, .kev-tag-text, .kev-top3 { text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000; color: #fff; }
 .kev-name { margin: 8px 20px; font-size: 45px; position: relative; z-index: 1; pointer-events: none; }
@@ -99,8 +102,52 @@ button[data-event-hidden] { display: none !important; }
         }, 50);
     }
 
+    // The start lock: until the event's start time nobody but the owner can open a map. The
+    // clock is the Worker's (sent with the standings), not this computer's, and the Worker
+    // refuses runs uploaded before the start whatever a page does.
+    let clockOffset = 0;
+    let isOwner = false;
+    const serverNow = () => Date.now() + clockOffset;
+    const startMs = CFG.start ? Date.parse(CFG.start) : null;
+    window.__eventLocked = () => !isOwner && startMs != null && serverNow() < startMs;
+    Promise.resolve(window.__eventIsOwner?.()).then((v) => {
+        isOwner = !!v;
+        applyLock();
+    }, () => {});
+    const startText = () => (startMs == null ? "" : new Date(startMs).toLocaleString([], { dateStyle: "full", timeStyle: "short" }));
+    function applyLock() {
+        const locked = window.__eventLocked();
+        document.querySelector(".track-selection-ui")?.classList.toggle("kev-locked", locked);
+        return locked;
+    }
+    function lockedNotice() {
+        alert("The maps open when the event starts: " + startText() + ".");
+    }
+
+    // Every way of opening a map goes through the game's __bw_selectTrackById; while locked it
+    // refuses the event's maps.
+    {
+        let realSelect = window.__bw_selectTrackById;
+        Object.defineProperty(window, "__bw_selectTrackById", {
+            configurable: true,
+            get() {
+                if (!realSelect) return undefined;
+                return (id) => {
+                    if (window.__eventLocked() && TRACKS.some((t) => t.id === id)) {
+                        lockedNotice();
+                        return false;
+                    }
+                    return realSelect(id);
+                };
+            },
+            set(v) {
+                realSelect = v;
+            },
+        });
+    }
+
     function timeLeft() {
-        const now = Date.now();
+        const now = serverNow();
         const start = CFG.start ? Date.parse(CFG.start) : null;
         const end = CFG.end ? Date.parse(CFG.end) : null;
         const fmt = (ms) => {
@@ -133,7 +180,7 @@ button[data-event-hidden] { display: none !important; }
             if (t.cover) cover.style.imageRendering = "auto";
             if (t.cover && t.coverFit === "contain") cover.classList.add("kev-fit");
             cover.title = "Play";
-            cover.addEventListener("click", () => openTrack(t.id, true));
+            cover.addEventListener("click", () => (window.__eventLocked() ? lockedNotice() : openTrack(t.id, true)));
             const name = card.appendChild(el("p", "kev-name"));
             name.appendChild(el("span", "kev-num", t.label));
             name.appendChild(document.createTextNode(t.name));
@@ -146,7 +193,7 @@ button[data-event-hidden] { display: none !important; }
             const right = card.appendChild(el("div", "kev-right"));
             const top3 = right.appendChild(el("ul", "kev-top3"));
             const view = right.appendChild(el("button", "kev-view", "See leaderboard"));
-            view.addEventListener("click", () => openTrack(t.id, false));
+            view.addEventListener("click", () => (window.__eventLocked() ? lockedNotice() : openTrack(t.id, false)));
             cards.set(t.id, { top3, cover, t });
         }
         list.appendChild(el("div", "kev-card")).style.height = "40px";
@@ -162,8 +209,12 @@ button[data-event-hidden] { display: none !important; }
         refresh();
         setInterval(() => {
             if (container.classList.contains("open")) refresh();
-            if (subEl) subEl.textContent = timeLeft();
         }, REFRESH_MS);
+        // The countdown and the lock follow the clock closely, so the maps open on time.
+        applyLock();
+        setInterval(() => {
+            if (subEl) subEl.textContent = timeLeft() + (applyLock() ? " · maps are locked until then" : "");
+        }, 1000);
     }
 
     function row(rank, name, count, ap, cls) {
@@ -219,6 +270,7 @@ button[data-event-hidden] { display: none !important; }
             const res = await fetch(API + "event/standings" + (profileToken() ? "?userToken=" + profileToken() : ""), { credentials: "omit", cache: "no-store" });
             if (!res.ok) throw new Error("HTTP " + res.status);
             const data = await res.json();
+            if (typeof data.now === "number") clockOffset = data.now - Date.now();
             const me = profileNickname();
             entriesDiv.innerHTML = "";
             data.standings.forEach((p, i) => {

@@ -116,6 +116,8 @@ function readConfig(env) {
         // The event's tracks (real track ids) and their week, for the overall standings.
         eventTracks: listVar(env.EVENT_TRACK_IDS, []).map((s) => s.trim().toLowerCase()).filter((s) => HEX64.test(s)),
         eventWeek: intVar(env.EVENT_WEEK) ?? intVar(env.CURRENT_WEEK) ?? 1,
+        // Runs uploaded before this moment are refused (owner and Author Medal account excepted).
+        eventStart: env.EVENT_START ? Date.parse(env.EVENT_START) || null : null,
         ownerKeys: hashSet(env.OWNER_KEY_HASHES),
         // Moderators: sha256(OWNER_KEY_PREFIX + token), like the owner's, but they only get the
         // moderation page. Their own runs are checked and shielded like anyone else's.
@@ -640,7 +642,7 @@ function standingsFrom(cfg, boards, viewer) {
         averageRank: p.positions.reduce((a, b) => a + b, 0) / p.positions.length,
     })).sort((a, b) => b.finished - a.finished || a.averageRank - b.averageRank);
     // loaded < totalTracks while the first summaries are still being gathered.
-    return { updated: Date.now(), totalTracks: cfg.eventTracks.length, loaded: boards.length, standings, tracks };
+    return { updated: Date.now(), now: Date.now(), start: cfg.eventStart, totalTracks: cfg.eventTracks.length, loaded: boards.length, standings, tracks };
 }
 
 async function computeStandings(env, cfg, request, viewer) {
@@ -827,6 +829,10 @@ async function handleSubmit(request, url, env, cfg, origin) {
     const track = await trackContext(cfg, trackId, url.searchParams.get("nswsWeek"));
     const hash = await sha256Hex(token);
     const ownerUpload = cfg.owner || await isOwner(token, cfg);
+    // The start lock: no run counts before the event starts.
+    if (track.week != null && cfg.eventStart && Date.now() < cfg.eventStart && !ownerUpload && !cfg.authorIds.has(hash)) {
+        return plain(403, "The event hasn't started yet", origin);
+    }
     const read = readOptions(form);
     const body = track.hiddenId ? replaceFormValue(raw, "trackId", track.hiddenId) : raw;
 

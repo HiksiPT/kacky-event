@@ -58,6 +58,10 @@ OWNER_KEY_HASHES = ["4950cdc42f1c2754a93ce720eb7a0d43616cf2148ee35f7d039b410416e
 MODERATOR_KEY_HASHES = ["5d8f7b8637650e58ed043165cb8370172e3c549b8e386a016151a71b949ab735"]
 OWNER_USER_IDS = ["35eb5c466738dc9917d5f8320f5b99f12015247aaf0e512f5e4ecb547f00e0e1"]
 
+# Written by tools/build-event.js: the event's start. Runs uploaded before it are refused,
+# except the owner's and the Author Medal account's.
+EVENT_START = "2026-10-10T18:00:00Z"
+
 # Written by tools/build-event.js: the event's track ids.
 EVENT_TRACK_IDS = [
     "e5e853a39fe100c88d5ab91d51e8aa31e2537c8920fbbf1b162fe093bd177241", # #01 Lateral Leap
