@@ -36,7 +36,7 @@ HIDE_TIMES = "false"
 #             rank, standings), so they think it counted; nobody else sees it or is ranked
 #             against it.
 #   "public": shown to everyone and counted until you remove it.
-OFFSITE_RUNS = "shadow"
+OFFSITE_RUNS = "public"
 
 # The medal account. Its time sets the Author/Gold/Silver/Bronze medals, and it is left
 # out of the overall standings and of every player's rank. Must match

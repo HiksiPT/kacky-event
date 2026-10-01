@@ -922,7 +922,8 @@ async function passThrough(request, url, cfg, origin, ctx, env) {
         const anti = antiCheat(env);
         const token = url.searchParams.get("userToken");
         url.searchParams.delete("userToken");      // never forwarded upstream
-        if (ids.length && anti) {
+        // The owner may watch any run: the game sends the profile's token with the request.
+        if (ids.length && anti && !(await isOwner(token, cfg))) {
             const mine = token && HEX64.test(token) ? await sha256Hex(token) : null;
             const others = (await anti.eventRunIds(ids)).filter((r) => r.userId !== mine);
             if (others.length) return plain(403, "Recording is private", origin);
