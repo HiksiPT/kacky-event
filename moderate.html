@@ -146,7 +146,7 @@ tr.hidden td { opacity: .55; }
     const withAuthor = data.tracks.filter((t) => t.authorFrames != null).length;
     out.push("<h2>Validation runs (author times)</h2>");
     out.push(`<p class="muted">The runs that were already on each map's own Kodub leaderboard when the site first read it are its validation runs. They are never shown on the site, and the fastest one on each map is its author time (the medals). ${withAuthor} of ${data.tracks.length} maps have one; open a map below to see them. If a validation run isn't one (someone else's old run), <b>Remove</b> it so it isn't used, or <b>Show as a normal run</b>.</p>
-      <p><button data-act="rebaseline">Re-read validation runs now</button> <span class="muted">Takes every run on the maps' Kodub leaderboards right now as the validation runs. Use it just before the event starts, never during it: runs driven off the site since then would become validation runs too.</span></p>`);
+      <p><button data-act="rebaseline">Re-read validation runs now</button> <span class="muted">Takes every run on the maps' Kodub leaderboards right now as the validation runs: all of them are hidden from the site (including any shown as normal runs or removed before), and the fastest on each map becomes its author time. Use it just before the event starts, never during it: runs driven off the site since then would become validation runs too.</span></p>`);
 
     out.push("<h2>Banned accounts</h2>");
     out.push(bans.size ? "<table><tr><th>Name</th><th>Reason</th><th>When</th><th></th></tr>" + [...bans.values()].map((b) =>
@@ -220,7 +220,7 @@ tr.hidden td { opacity: .55; }
       }
       return;
     }
-    if (d.act === "rebaseline" && !confirm("Take every run that is on the maps' Kodub leaderboards right now as the validation runs (author times)? Only do this before the event starts.")) return;
+    if (d.act === "rebaseline" && !confirm("Take every run that is on the maps' Kodub leaderboards right now as the validation runs? They all stop showing on the site and the fastest on each map becomes its author time. Only do this before the event starts.")) return;
     if (d.act === "ban" || d.act === "remove") {
       const reason = prompt((d.act === "ban" ? "Ban " : "Remove the run by ") + (d.name || "this player") + "? Reason (optional):", "");
       if (reason === null) return;

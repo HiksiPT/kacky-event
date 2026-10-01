@@ -185,15 +185,20 @@ export class AntiCheat extends DurableObject {
     }
 
     // Takes every run now on the maps' own Kodub boards as the validation runs (the owner's
-    // "re-read validation runs" button, for just before the event starts).
+    // "re-read validation runs" button, for just before the event starts). All of them are
+    // hidden from the site, including ones earlier let in as normal runs, and earlier
+    // removals are forgotten, so the fastest run on each board is the author time.
     async rebaseline(list) {
         for (const b of list) {
             this.sql.exec(`INSERT INTO boards (track, week, cutoff, seen) VALUES (?, ?, ?, ?)
                 ON CONFLICT(track) DO UPDATE SET cutoff = excluded.cutoff, seen = excluded.seen`, b.track, b.week, b.cutoff, Date.now());
-            this.sql.exec("DELETE FROM runs WHERE track = ? AND id <= ? AND source IN ('outside', 'legacy')", b.track, b.cutoff);
+            this.sql.exec("DELETE FROM runs WHERE track = ? AND id <= ?", b.track, b.cutoff);
             this.sql.exec("DELETE FROM queue WHERE track = ? AND run_id <= ?", b.track, b.cutoff);
+            this.sql.exec("DELETE FROM removed WHERE track = ? AND id <= ?", b.track, b.cutoff);
+            this.sql.exec("DELETE FROM flagged WHERE track = ? AND id <= ?", b.track, b.cutoff);
             this.boards.delete(b.track);
         }
+        this.mod = null;
         return { ok: true, tracks: list.length };
     }
 
